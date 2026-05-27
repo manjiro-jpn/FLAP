@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>選手登録</title>
+<style>
+body{font-family:sans-serif;margin:16px;background:#f5f5f5;}
+h1{font-size:1.3em;}
+.form-area{background:#fff;padding:16px;border-radius:8px;margin-bottom:16px;}
+input[type="text"]{width:70%;padding:8px;font-size:1em;border:1px solid #ccc;border-radius:4px;}
+button{padding:8px 16px;font-size:1em;border:none;border-radius:4px;cursor:pointer;margin:4px;}
+.btn-add{background:#4CAF50;color:#fff;}
+.btn-del{background:#f44336;color:#fff;font-size:0.8em;padding:4px 10px;}
+.btn-nav{background:#2196F3;color:#fff;}
+.btn-clear{background:#ff5722;color:#fff;font-size:0.85em;padding:6px 14px;}
+.count{font-size:1.1em;font-weight:bold;margin:12px 0;}
+#list{list-style:none;padding:0;}
+#list li{background:#fff;margin:4px 0;padding:10px 12px;border-radius:4px;display:flex;justify-content:space-between;align-items:center;}
+.msg{color:red;font-size:0.9em;margin-top:8px;}
+.clear-area{margin-top:24px;padding-top:16px;border-top:2px solid #ccc;}
+</style>
+</head>
+<body>
+<h1>⚽ 選手登録</h1>
+<div class="form-area">
+  <input type="text" id="nameInput" placeholder="選手名を入力">
+  <button class="btn-add" onclick="addPlayer()">登録</button>
+  <div id="message" class="msg"></div>
+</div>
+<div class="count">登録人数：<span id="countDisplay">0</span> 人</div>
+<ul id="list"></ul>
+<br>
+<button class="btn-nav" onclick="location.href='phase.html'">フェーズ入力へ →</button>
+<div class="clear-area">
+  <button class="btn-clear" onclick="clearAll()">🗑 オールクリア（全データ削除）</button>
+</div>
+
+<script>
+function getPlayers(){
+  var raw=JSON.parse(localStorage.getItem('players')||'[]');
+  var clean=[];
+  for(var i=0;i<raw.length;i++){
+    if(typeof raw[i]==='string'&&raw[i]!==''){
+      clean.push(raw[i]);
+    }
+  }
+  if(clean.length!==raw.length){
+    localStorage.setItem('players',JSON.stringify(clean));
+  }
+  return clean;
+}
+function savePlayers(p){localStorage.setItem('players',JSON.stringify(p));}
+function updateCount(){document.getElementById('countDisplay').textContent=getPlayers().length;}
+function renderList(){
+  var players=getPlayers();
+  var ul=document.getElementById('list');
+  ul.innerHTML='';
+  for(var i=0;i<players.length;i++){
+    var li=document.createElement('li');
+    li.innerHTML='<span>'+(i+1)+'. '+players[i]+'</span><button class="btn-del" onclick="deletePlayer('+i+')">削除</button>';
+    ul.appendChild(li);
+  }
+  updateCount();
+}
+function addPlayer(){
+  var input=document.getElementById('nameInput');
+  var msg=document.getElementById('message');
+  var name=input.value.trim();
+  msg.textContent='';
+  if(!name){msg.textContent='名前を入力してください。';return;}
+  var players=getPlayers();
+  for(var i=0;i<players.length;i++){
+    if(players[i]===name){msg.textContent='「'+name+'」は既に登録されています。';return;}
+  }
+  players.push(name);
+  savePlayers(players);
+  input.value='';
+  renderList();
+}
+function deletePlayer(index){
+  var players=getPlayers();
+  if(confirm('「'+players[index]+'」を削除しますか？')){
+    players.splice(index,1);
+    savePlayers(players);
+    renderList();
+  }
+}
+function clearAll(){
+  if(confirm('選手データ・試合データをすべて削除します。よろしいですか？')){
+    localStorage.removeItem('players');
+    localStorage.removeItem('matchData');
+    renderList();
+    alert('全データを削除しました。');
+  }
+}
+renderList();
+</script>
+</body>
+</html>
