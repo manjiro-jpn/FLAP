@@ -5,69 +5,102 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>結果表示</title>
 <style>
-body{font-family:sans-serif;margin:16px;background:#f5f5f5;}
+:root{--bg:#f5f5f5;--card:#fff;--text:#222;--border:#ccc;--th-bg:#e0e0e0;--bar-bg:#eee;}
+@media (prefers-color-scheme: dark){
+:root{--bg:#121212;--card:#1e1e1e;--text:#eee;--border:#555;--th-bg:#333;--bar-bg:#333;}
+}
+body{font-family:sans-serif;margin:16px;background:var(--bg);color:var(--text);}
 h1{font-size:1.3em;}
-table{border-collapse:collapse;width:100%;margin:12px 0;background:#fff;}
-th,td{border:1px solid #ccc;padding:6px 8px;text-align:center;font-size:0.9em;}
-th{background:#e0e0e0;}
-.bar-container{width:100%;background:#eee;border-radius:4px;height:18px;}
+table{border-collapse:collapse;width:100%;margin:12px 0;background:var(--card);}
+th,td{border:1px solid var(--border);padding:6px 8px;text-align:center;font-size:0.9em;}
+th{background:var(--th-bg);}
+.bar-container{width:100%;background:var(--bar-bg);border-radius:4px;height:18px;}
 .bar{height:18px;background:#4CAF50;border-radius:4px;text-align:center;color:#fff;font-size:0.75em;line-height:18px;}
-.change-block{background:#fff;padding:10px;border-radius:8px;margin:8px 0;}
+.change-block{background:var(--card);padding:10px;border-radius:8px;margin:8px 0;}
 .change-title{font-weight:bold;margin-bottom:4px;}
-.in{color:green;font-weight:bold;}
-.out{color:red;font-weight:bold;}
+.in{color:#4CAF50;font-weight:bold;}
+.out{color:#f44336;font-weight:bold;}
+.summary{font-size:1.05em;font-weight:bold;margin:8px 0;}
 button{padding:8px 16px;font-size:1em;border:none;border-radius:4px;cursor:pointer;margin:4px;}
 .btn-nav{background:#2196F3;color:#fff;}
+.btn-copy{background:#FF9800;color:#fff;}
 </style>
 </head>
 <body>
 <h1>⚽ 結果・出場時間</h1>
 <div id="result"></div>
 <br>
+<button class="btn-copy" onclick="copyResult()">📋 結果をコピー</button>
 <button class="btn-nav" onclick="location.href='phase.html'">← フェーズ入力</button>
 <button class="btn-nav" onclick="location.href='index.html'">← 選手登録</button>
 
 <script>
 var PHASE_NAMES=['前半 0-15','前半 15-30','後半 0-15','後半 15-30'];
 var FORMATIONS={'14231':'1-4-2-3-1','1442':'1-4-4-2','1352':'1-3-5-2','1343':'1-3-4-3'};
+var lastCopyText='';
+
+function escapeHtml(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
 
 function render(){
   var md=JSON.parse(localStorage.getItem('matchData')||'{}');
+  var registered=JSON.parse(localStorage.getItem('players')||'[]');
   var container=document.getElementById('result');
-  if(!md.phase0){container.innerHTML='<p>データがありません。フェーズ入力で保存してください。</p>';return;}
+  if(!md.phase0){container.innerHTML='<p>データがありません。フェーズ入力で保存してください。</p>';lastCopyText='';return;}
 
   var allPlayers={};
+  var order={};
+  for(var r=0;r<registered.length;r++){
+    allPlayers[registered[r]]=[0,0,0,0];
+    order[registered[r]]=r;
+  }
+  var extra=registered.length;
   for(var p=0;p<4;p++){
     var ph=md['phase'+p];
     if(!ph) continue;
     for(var i=0;i<ph.members.length;i++){
       var name=ph.members[i];
       if(!name) continue;
-      if(!allPlayers[name]) allPlayers[name]=[0,0,0,0];
+      if(!allPlayers[name]){allPlayers[name]=[0,0,0,0];order[name]=extra++;}
       allPlayers[name][p]=1;
     }
   }
 
-  var html='<table><tr><th>選手</th>';
+  var rows=[];
+  var playedCount=0;
+  for(var name in allPlayers){
+    var phases=allPlayers[name];
+    var total=0;
+    for(var p2=0;p2<4;p2++) total+=phases[p2]*15;
+    if(total>0) playedCount++;
+    rows.push({name:name,phases:phases,total:total,order:order[name]});
+  }
+  rows.sort(function(a,b){
+    if(b.total!==a.total) return b.total-a.total;
+    return a.order-b.order;
+  });
+
+  var html='<div class="summary">出場選手：'+playedCount+'名 / 登録'+rows.length+'名</div>';
+  html+='<table><tr><th>選手</th>';
   for(var p=0;p<4;p++) html+='<th>'+PHASE_NAMES[p]+'</th>';
   html+='<th>合計</th><th>出場時間バー</th></tr>';
 
-  var names=Object.keys(allPlayers);
-  for(var n=0;n<names.length;n++){
-    var name=names[n];
-    var phases=allPlayers[name];
-    var total=0;
-    html+='<tr><td>'+name+'</td>';
-    for(var p=0;p<4;p++){
-      html+='<td>'+(phases[p]?'○':'−')+'</td>';
-      total+=phases[p]*15;
+  var copyLines=['⚽ 出場時間'];
+  for(var n=0;n<rows.length;n++){
+    var row=rows[n];
+    html+='<tr><td>'+escapeHtml(row.name)+'</td>';
+    for(var p3=0;p3<4;p3++){
+      html+='<td>'+(row.phases[p3]?'○':'−')+'</td>';
     }
-    var pct=Math.round(total/60*100);
-    html+='<td>'+total+'分</td>';
-    html+='<td><div class="bar-container"><div class="bar" style="width:'+pct+'%">'+total+'分</div></div></td>';
+    var pct=Math.round(row.total/60*100);
+    html+='<td>'+row.total+'分</td>';
+    html+='<td><div class="bar-container"><div class="bar" style="width:'+pct+'%">'+row.total+'分</div></div></td>';
     html+='</tr>';
+    copyLines.push(row.name+'：'+row.total+'分');
   }
   html+='</table>';
+  lastCopyText=copyLines.join('\n');
 
   for(var p=1;p<4;p++){
     var prev=md['phase'+(p-1)];
@@ -77,8 +110,8 @@ function render(){
     for(var i=0;i<prev.members.length;i++) if(prev.members[i]) prevSet[prev.members[i]]=1;
     for(var i=0;i<curr.members.length;i++) if(curr.members[i]) currSet[curr.members[i]]=1;
     var inList=[];var outList=[];
-    for(var k in currSet) if(!prevSet[k]) inList.push(k);
-    for(var k in prevSet) if(!currSet[k]) outList.push(k);
+    for(var k in currSet) if(!prevSet[k]) inList.push(escapeHtml(k));
+    for(var k in prevSet) if(!currSet[k]) outList.push(escapeHtml(k));
     html+='<div class="change-block"><div class="change-title">'+PHASE_NAMES[p-1]+' → '+PHASE_NAMES[p]+'</div>';
     if(prev.system!==curr.system) html+='<div>システム変更: '+FORMATIONS[prev.system]+' → '+FORMATIONS[curr.system]+'</div>';
     if(inList.length||outList.length){
@@ -90,6 +123,27 @@ function render(){
     html+='</div>';
   }
   container.innerHTML=html;
+}
+
+function copyResult(){
+  if(!lastCopyText){alert('コピーできる結果がありません。');return;}
+  function done(){alert('結果をコピーしました。');}
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(lastCopyText).then(done,function(){
+      fallbackCopy();
+    });
+  } else {
+    fallbackCopy();
+  }
+  function fallbackCopy(){
+    var ta=document.createElement('textarea');
+    ta.value=lastCopyText;
+    document.body.appendChild(ta);
+    ta.select();
+    try{document.execCommand('copy');done();}
+    catch(e){alert('コピーできませんでした。');}
+    document.body.removeChild(ta);
+  }
 }
 render();
 </script>
